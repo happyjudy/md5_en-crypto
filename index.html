@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <title></title>
+        <style>
+            #unencrypt{
+                margin-top: 30px;
+            }
+            .tips{
+                font-size: 12px;
+                color:blue;
+                display: none;
+            }
+        </style>
+    </head>
+
+    <body>
+        <div style="font-size: 12px; color: red; margin: 20px;">
+            提前打开控制台，查看撞库进度：<br/>
+            在页面上右键单击->点击“检查”->点击“Console” 打开控制台<br>
+            数据量大时，页面可能会暂时卡顿，数正常现象，控制台有进度在更新，数据即在处理中……
+        </div>
+        <div id="encrypt" style="margin: 20px;">
+            <div style="font-size: 14px; margin-top: 15px;">
+                <b>md5 加密</b>
+            </div>
+            <input type='file' accept='text/plain' onchange='encrypto(event)'><br>
+            <div class="tips" id="tips">文件加密中，请稍等…</div>
+        </div>
+        
+        <div style="font-size: 14px; margin: 20px;">
+            <div>
+                <b>md5 解密</b>
+            </div>
+            <div id="load_initial_data">
+                <div>第一步：请先选择原始未加密数据，做数据源</div>
+                <input type='file' accept='text/plain' onchange='getInitalData(event)'><br>
+                <div class='tips' id="loading_tip">数据加载中</div>
+            </div>
+            <br>
+            <div id="loading_after">
+                <div>第二步：请选择撞库后的md5数据</div>
+                <input type='file' accept='text/plain' onchange='getMd5Data(event)'><br>
+                <div class="tips" id="find_tips">文件撞库中，请稍等…</div>
+                
+            </div>
+        </div>
+        <div></div>
+        
+    </body>
+    <script src="./js/jquery.min.js"></script>
+    <script src="./js/FileSaver.js "></script>
+    <script src="./js/jquery.md5.js "></script>
+    <script type="text/javascript">
+        var dataCenter = {
+            initialData: []
+        };
+
+        // 加密
+        function encrypto(event){
+            $("#tips").show();
+            openFile (event, $.md5, data => {
+                exportFiles(data.join('\n'), uitil_fileName('md5加密_'),function(){
+                    $("#tips").hide();
+                })
+            }) 
+        }
+        function uitil_fileName(name){
+            let date = new Date();
+            let _name = name || '';
+
+            return _name +
+                (date.getFullYear() + '').padStart(4, '0') +
+                (date.getMonth() + 1 + '').padStart(2, '0') + 
+                (date.getDate() + '').padStart(2, '0')
+        }
+
+        // 解密
+        // 获取原始数据，并添加MD5加密格式
+        function getInitalData(event){
+            $('#loading_tip').show()
+
+            openFile (event,data => {
+                return $.md5(data) + ',' + data
+            }, data => {
+                dataCenter.initialData = data
+                $('#loading_tip').hide()
+                alert('数据加载成功，请继续下一步操作')
+            })
+        }
+        // 选择md5数据，进行撞库，并导出
+        function getMd5Data(event){
+            let initialData = dataCenter.initialData;
+            if(!initialData || initialData.length === 0){
+                alert('请刷新页面，先执行第一步，再执行后续步骤')
+                return
+            }
+            $('#find_tips').show()
+            openFile(event, data => {
+                return data;
+            }, data => {
+                // 撞库
+                let targetResult = findTargetData(initialData, data)
+                // 导出数据
+                exportFiles(targetResult.targetData.join('\n'),uitil_fileName('md5解密成功_'), function(){
+                    $("#find_tips").hide();
+
+                    exportFiles(targetResult.untartgetMd5Data.join('\n'),uitil_fileName('md5解密失败_'))
+                })
+            })
+        }
+
+        // 撞库匹配目标数据
+        function findTargetData(initialData, md5Data){
+            let targetData = [],
+                untartgetMd5Data = [],
+                md5DataLength = md5Data.length,
+                startTime = new Date().getTime(),
+                endTime
+            console.log(666)
+            md5Data.map((md5DataItem, md5DataIndex) => {
+                let targetIndex = initialData.findIndex(initialDataitem => {
+                    return initialDataitem.includes(md5DataItem)
+                })
+                console.log('targetIndex', targetIndex)
+
+                if(targetIndex != -1) {
+                    targetData.push(initialData[targetIndex].split(',')[1])
+                }else {
+                    untartgetMd5Data.push(md5DataItem)
+                }
+
+                let doneDataLength = md5DataIndex + 1
+
+                if(doneDataLength%1000 === 0){
+                    let progress =(doneDataLength/md5DataLength * 100).toFixed(2) + '%'
+                    console.log('已处理' + doneDataLength + '条，成功匹配' + targetData.length + '条，匹配失败'+ untartgetMd5Data.length +'条，进度为' + progress)
+                }
+            })
+            endTime = new Date().getTime()
+            console.log('共成功解密' + targetData.length + '条，失败' + untartgetMd5Data.length + '条')
+            console.log('共花费了' + formatDuring(endTime - startTime))
+
+            return {
+                targetData,
+                untartgetMd5Data
+            }
+        }
+
+        // 时间戳=》时分秒
+        function formatDuring(mss) {
+            var hours = parseInt((mss % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            var minutes = parseInt((mss % (1000 * 60 * 60)) / (1000 * 60));
+            var seconds = (mss % (1000 * 60)) / 1000;
+            hours = hours < 10 ? ('0' + hours) : hours;
+            minutes = minutes < 10 ? ('0' + minutes) : minutes;
+            seconds = seconds < 10 && seconds >= 1 ? ('0' + seconds) : seconds;
+            return  hours + "时" + minutes + "分" + seconds + "秒";
+        }
+        // .txt文件读取 input[type=file]，并处理数据
+        function openFile (event, formatDataFn, callback) {
+            var file = event.target.files[0]
+            var reader = new FileReader()
+            reader.readAsText(file)
+
+            reader.onload = function() {
+                if(reader.result) {
+                    let data = reader.result.split(/\n/),
+                        formattedData = [],
+                        progress
+
+                    data.map((item, index) => {
+                        let formattedDataLength;
+                        item && (item = item.trim())
+                        item && formattedData.push(formatDataFn(item))
+
+                        formattedDataLength = formattedData.length
+                        if(formattedDataLength%10000 === 0){
+                            progress = ((formattedDataLength/data.length) * 100).toFixed(2) + '%'
+                            console.log('数据已处理'+ formattedDataLength + '条，进度为' + progress)
+                        }
+                    })
+                    console.log('数据处理完成，共' + formattedData.length + '条')
+                    
+                    callback(formattedData)
+                }
+            }
+        }
+
+        // 文件导出 FileSave.js https://github.com/eligrey/FileSaver.js
+        function exportFiles(content, fileName, callback){
+            var blob = new Blob([content], {type: "text/plain;charset=utf-8"});
+            saveAs(blob, fileName);
+            typeof callback === 'function' && callback();
+        }
+
+        function util_checkChrome(){
+            let userAgent = navigator.userAgent.toLowerCase()
+            if(userAgent.indexOf('chrome') != -1 && userAgent.indexOf('safari') != -1) {
+                return
+            }
+            alert('请使用chrome浏览器');
+        }
+        util_checkChrome();
+    </script>
+</html>
