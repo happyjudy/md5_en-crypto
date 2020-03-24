@@ -80,14 +80,34 @@
         // 获取原始数据，并添加MD5加密格式
         function getInitalData(event){
             $('#loading_tip').show()
+            
+            let initialData = {},
+                file = event.target.files[0],
+                reader = new FileReader()
 
-            openFile (event,data => {
-                return $.md5(data) + ',' + data
-            }, data => {
-                dataCenter.initialData = data
-                $('#loading_tip').hide()
-                alert('数据加载成功，请继续下一步操作')
-            })
+            reader.readAsText(file)
+
+            reader.onload = function(){
+                if(reader.result){
+                    let data = reader.result.split(/\n/)
+                    
+                    data.map((item, index) => {
+                        let doneLength = index + 1
+                        item = item.trim()
+                        initialData[$.md5(item)] = item
+
+                        if(doneLength%50000 === 0){
+                            let progress = ((doneLength/data.length) * 100).toFixed(2) + '%'
+                            console.log('数据已处理'+ doneLength + '条，进度为' + progress)
+                        }
+                    })
+
+                    dataCenter.initialData = initialData
+                    $('#loading_tip').hide()
+                    console.log('明文数据加载完成，共' + data.length + '条')
+                    alert('明文数据加载成功，请继续下一步操作')
+                }
+            }
         }
         // 选择md5数据，进行撞库，并导出
         function getMd5Data(event){
@@ -97,6 +117,7 @@
                 return
             }
             $('#find_tips').show()
+            
             openFile(event, data => {
                 return data;
             }, data => {
@@ -118,24 +139,21 @@
                 md5DataLength = md5Data.length,
                 startTime = new Date().getTime(),
                 endTime
-            console.log(666)
+            
             md5Data.map((md5DataItem, md5DataIndex) => {
-                let targetIndex = initialData.findIndex(initialDataitem => {
-                    return initialDataitem.includes(md5DataItem)
-                })
-                console.log('targetIndex', targetIndex)
+                let targetVal = initialData[md5DataItem]
 
-                if(targetIndex != -1) {
-                    targetData.push(initialData[targetIndex].split(',')[1])
+                if(targetVal) {
+                    targetData.push(targetVal)
                 }else {
                     untartgetMd5Data.push(md5DataItem)
                 }
 
                 let doneDataLength = md5DataIndex + 1
 
-                if(doneDataLength%1000 === 0){
+                if(doneDataLength%50000 === 0){
                     let progress =(doneDataLength/md5DataLength * 100).toFixed(2) + '%'
-                    console.log('已处理' + doneDataLength + '条，成功匹配' + targetData.length + '条，匹配失败'+ untartgetMd5Data.length +'条，进度为' + progress)
+                    console.log('已解密处理' + doneDataLength + '条，成功匹配' + targetData.length + '条，匹配失败'+ untartgetMd5Data.length +'条，进度为' + progress)
                 }
             })
             endTime = new Date().getTime()
@@ -176,12 +194,13 @@
                         item && formattedData.push(formatDataFn(item))
 
                         formattedDataLength = formattedData.length
-                        if(formattedDataLength%10000 === 0){
+                        if(formattedDataLength%50000 === 0){
                             progress = ((formattedDataLength/data.length) * 100).toFixed(2) + '%'
                             console.log('数据已处理'+ formattedDataLength + '条，进度为' + progress)
                         }
                     })
                     console.log('数据处理完成，共' + formattedData.length + '条')
+                    console.log('——————————————————————————————————————————————————————')
                     
                     callback(formattedData)
                 }
